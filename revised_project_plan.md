@@ -1,68 +1,63 @@
+# Revised Project Plan: Algorithmic Trading Model
 
-### Revised Project Plan: Elite Ensemble for Market Prediction
+**Objective:** Develop a robust, real-time algorithmic trading model by enhancing an initial Kaggle-based solution with live data, advanced feature engineering, and a professional development workflow, including comprehensive options data analysis.
 
-**Objective:** Develop a high-performance, adaptive modeling pipeline to predict S&P 500 excess returns. The solution will be an ensemble of models with a meta-learner, incorporate advanced feature engineering, and use online learning to adapt to new market data, with the ultimate goal of maximizing the competition's Sharpe-like metric.
+---
 
-**1. Data Preprocessing & Initial Analysis (with `polars`)**
+### Step 1: Initial Setup & Environment Configuration (Completed)
+- **Task:** Establish a clean, isolated virtual environment for the project.
+- **Details:** Created a `venv` and installed all necessary dependencies (`numpy==2.2.0`, `pandas-ta`, `yfinance`, etc.) from a `requirements.txt` file to resolve library version conflicts.
+- **Status:** Done.
 
-*   **Efficient Data Loading:** Use the `polars` library for high-performance data manipulation.
-*   **Initial Filtering:**
-    *   Load `train.csv` and filter it to the most recent and relevant data (e.g., the last 1000 rows, `date_id >= 37`) to focus the model on the current market regime.
-    *   Drop columns with a high percentage of missing values (e.g., > 50%) to reduce noise.
-*   **Imputation Strategy:**
-    *   For interest rate features (`I*`), use forward/backward fills.
-    *   For other features, impute remaining missing values using the median. Cache these median values for consistent application on test data.
+### Step 2: Data Exploration & Initial Cleaning (Completed)
+- **Task:** Analyze the initial `train.csv` dataset to understand its structure and identify missing values.
+- **Details:** Used pandas for initial data loading and `seaborn`/`matplotlib` to create heatmaps and bar charts visualizing the percentage of missing data per feature. This informed our data cleaning and imputation strategy.
+- **Status:** Done.
 
-**2. Advanced Feature Engineering**
+### Step 3: Advanced Feature Engineering & Modeling (Completed)
+- **Task:** Engineer new features and build a stacked ensemble model.
+- **Details:** 
+    - Used `polars` for high-performance data manipulation.
+    - Created derived features and interaction terms from the original Kaggle dataset.
+    - Imputed missing values using forward-fills and median values.
+    - Trained three base models (ElasticNet, XGBoost, LightGBM) on a reduced feature set.
+    - Trained a `LinearRegression` meta-learner on the predictions of the base models.
+- **Status:** Done.
 
-*   **Base Feature Set:** Define a core set of features by selecting prefixes (D, E, I, M, P, S, V).
-*   **Derived Features:** Engineer new features to capture complex relationships, including:
-    *   **Interest Rate Spreads:** `U1 = I2 - I1`
-    *   **Economic Ratios:** `U2 = M11 / ((I2 + I9 + I7) / 3)`
-    *   **Interaction Terms:** Create features by multiplying potentially related indicators, such as `V1 * S1`, `M11 * V1`, and `I9 * S1`.
-*   **Lagged Features:** Incorporate `lagged_market_forward_excess_returns` from the test set as a predictive feature.
+### Step 4: Volatility-Adjusted Allocation Strategy (Completed)
+- **Task:** Develop a function to translate model predictions into a risk-adjusted allocation strategy.
+- **Details:** Created a `get_allocations` function that estimates volatility and uses it to scale, clip, and smooth the raw model output. Backtested the strategy against the training data to validate performance.
+- **Status:** Done.
 
-**3. Ensemble Model Development & Stacking**
+### Step 5: Real-Time Implementation & Advanced Feature Engineering
 
-*   **Base Models:** Train a diverse set of models on the preprocessed and engineered features:
-    1.  **ElasticNet:** A robust linear model.
-    2.  **XGBoost:** A powerful gradient boosting model.
-    3.  **LightGBM:** A fast and efficient gradient boosting model.
-*   **Feature Selection:**
-    *   Use the feature importance scores from the initial XGBoost model to identify the top ~15 most predictive features.
-    *   Retrain the base models using only this reduced, high-signal feature set.
-*   **Stacking with a Meta-Learner:**
-    *   Use the predictions from the three retrained base models as input features for a final `LinearRegression` meta-model.
-    *   This meta-learner will determine the optimal weights for combining the base model predictions.
+**5a. Live Data Pipeline for Equities (In Progress)**
+- **Task:** Transition from the static Kaggle dataset to a live data pipeline using `yfinance`.
+- **Details:** 
+    - Create `data_pipeline.py`.
+    - Fetch historical S&P 500 (SPY) data, ensuring column names are correctly flattened and standardized.
+    - Manually engineer a robust set of technical analysis features (RSI, MACD, Bollinger Bands, etc.) using direct calls to `pandas-ta` functions for better portability.
 
-**4. Volatility-Adjusted Allocation Strategy**
+**5b. New: Comprehensive Options Data Pipeline & Feature Engineering**
+- **Task:** Extend the data pipeline to fetch and engineer a wide array of features from options chain data to capture forward-looking market sentiment and positioning.
+- **Details:**
+    - In `data_pipeline.py`, add functionality to fetch full options chain data (calls and puts) for multiple near-term expiration dates for SPY.
+    - **Sentiment & Flow Analysis:** Calculate Put/Call ratios based on both daily volume and open interest to gauge trader sentiment.
+    - **Volatility Structure Analysis:**
+        - Calculate and track at-the-money (ATM) Implied Volatility as a core 'fear gauge'.
+        - Analyze the **Volatility Skew** by comparing the IV of out-of-the-money (OTM) puts versus OTM calls. A steep skew indicates high demand for downside protection.
+        - Analyze the **Term Structure** by comparing IV between short-term and longer-term options to understand expectations of future volatility.
+    - **Greeks Exposure Analysis:**
+        - Aggregate key Greeks (Delta, Gamma, Vega, Theta, Vanna) across the entire options chain.
+        - Calculate **Net Delta and Net Gamma exposure** to estimate dealer positioning, which can indicate potential price pinning or acceleration points (i.e., 'Gamma Flips').
+        - Analyze 'Charm' (Delta decay over time) to predict positioning changes as expiration approaches.
+    - These new features will serve as a rich, forward-looking input for a next-generation predictive model.
 
-*   **Volatility Estimation:**
-    *   Implement a **GARCH-like model** to get a dynamic estimate of market volatility. This will combine the `V1` feature with the standard deviation of recent target returns.
-*   **Signal Processing:**
-    *   Take the raw prediction from the meta-model and scale it with a multiplier to create a stronger "signal."
-    *   Clip the signal to the allowed allocation range `[0, 2]`.
-*   **Final Allocation:**
-    *   Adjust the signal based on the estimated volatility (i.e., reduce allocation in high-volatility regimes).
-    *   Apply a smoothing function (e.g., a weighted average of the new and previous allocation) and account for transaction costs to create a more stable and realistic betting strategy.
+**5c. Dashboard Creation**
+- **Task:** Build an interactive dashboard to visualize the model's real-time predictions and the new options data insights.
+- **Details:** 
+    - Use a library like `streamlit` or `dash`.
+    - Create visualizations for the live model allocation signal.
+    - Add new charts for advanced options analysis, including plots of the volatility skew/smile, Put/Call ratios over time, and net Gamma exposure to provide a complete market outlook.
 
-**5. Real-Time Implementation and Dashboard**
-
-*   **Data Integration with `yfinance`:**
-    *   Develop a module to fetch real-time and historical market data for the S&P 500 (ticker: `^GSPC`) using the `yfinance` library.
-*   **Market Feature Engineering:**
-    *   Map the original competition feature concepts to real-world data. Since the proprietary features (`M*`, `E*`, etc.) are not available, we will engineer a new feature set from the `yfinance` data. This will include:
-        *   **Technical Indicators:** RSI, MACD, Bollinger Bands, etc.
-        *   **Volatility Measures:** ATR (Average True Range), historical volatility (rolling standard deviation of returns).
-        *   **Momentum Features:** Various moving averages and rate-of-change indicators.
-*   **Live Online Learning:**
-    *   Adapt the online learning pipeline. The model will be updated with the latest daily returns calculated from the live `yfinance` data.
-    *   The ensemble model will retrain periodically (e.g., daily or weekly) with the latest data to ensure its predictions remain adaptive to current market conditions.
-*   **Real-Time Prediction Dashboard:**
-    *   Develop an interactive dashboard using a framework like **Streamlit** or **Dash**.
-    *   The dashboard will serve as the front-end for our model and will:
-        1.  Fetch the latest S&P 500 data on load.
-        2.  Run the entire prediction pipeline to generate a current allocation signal (from 0 to 2).
-        3.  Display the **current allocation signal** as the primary output.
-        4.  Visualize the historical performance of our strategy against a simple "buy-and-hold" S&P 500 strategy.
-        5.  Display key performance metrics, such as a running Sharpe ratio, total return, and maximum drawdown.
+---
