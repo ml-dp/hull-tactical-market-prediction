@@ -1,3 +1,4 @@
+
 ### Revised Project Plan: Elite Ensemble for Market Prediction
 
 **Objective:** Develop a high-performance, adaptive modeling pipeline to predict S&P 500 excess returns. The solution will be an ensemble of models with a meta-learner, incorporate advanced feature engineering, and use online learning to adapt to new market data, with the ultimate goal of maximizing the competition's Sharpe-like metric.
@@ -45,11 +46,23 @@
     *   Adjust the signal based on the estimated volatility (i.e., reduce allocation in high-volatility regimes).
     *   Apply a smoothing function (e.g., a weighted average of the new and previous allocation) and account for transaction costs to create a more stable and realistic betting strategy.
 
-**5. Online Learning and Submission**
+**5. Real-Time Implementation and Dashboard**
 
-*   **Adaptive Retraining:** Implement an online learning loop. As each new row of test data is processed:
-    *   Append the `lagged_market_forward_excess_returns` to our training data as a new target value.
-    *   Periodically retrain the entire ensemble and meta-learner to allow the model to adapt to the latest market data.
-*   **Submission:**
-    *   Integrate the entire pipeline—from feature creation to allocation—into the `predict` function required by the `kaggle_evaluation` API.
-    *   Ensure the startup time and prediction runtime are within the competition's limits (900 seconds).
+*   **Data Integration with `yfinance`:**
+    *   Develop a module to fetch real-time and historical market data for the S&P 500 (ticker: `^GSPC`) using the `yfinance` library.
+*   **Market Feature Engineering:**
+    *   Map the original competition feature concepts to real-world data. Since the proprietary features (`M*`, `E*`, etc.) are not available, we will engineer a new feature set from the `yfinance` data. This will include:
+        *   **Technical Indicators:** RSI, MACD, Bollinger Bands, etc.
+        *   **Volatility Measures:** ATR (Average True Range), historical volatility (rolling standard deviation of returns).
+        *   **Momentum Features:** Various moving averages and rate-of-change indicators.
+*   **Live Online Learning:**
+    *   Adapt the online learning pipeline. The model will be updated with the latest daily returns calculated from the live `yfinance` data.
+    *   The ensemble model will retrain periodically (e.g., daily or weekly) with the latest data to ensure its predictions remain adaptive to current market conditions.
+*   **Real-Time Prediction Dashboard:**
+    *   Develop an interactive dashboard using a framework like **Streamlit** or **Dash**.
+    *   The dashboard will serve as the front-end for our model and will:
+        1.  Fetch the latest S&P 500 data on load.
+        2.  Run the entire prediction pipeline to generate a current allocation signal (from 0 to 2).
+        3.  Display the **current allocation signal** as the primary output.
+        4.  Visualize the historical performance of our strategy against a simple "buy-and-hold" S&P 500 strategy.
+        5.  Display key performance metrics, such as a running Sharpe ratio, total return, and maximum drawdown.
