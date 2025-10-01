@@ -18,29 +18,28 @@ class LiveDataHandler:
     def fetch_data(self, period: str = "5y", interval: str = "1d") -> pd.DataFrame:
         """
         Fetches historical data for the specified ticker from Yahoo Finance.
-
-        Args:
-            period: The time period to fetch (e.g., "1y", "5y", "max").
-            interval: The data interval (e.g., "1d", "1wk").
-
-        Returns:
-            A pandas DataFrame with the fetched data.
         """
         logging.info(f"Fetching {period} of {interval} data for {self.ticker}...")
         self.data = yf.download(self.ticker, period=period, interval=interval)
+        
         if self.data.empty:
             logging.error(f"No data fetched for ticker {self.ticker}. Please check the ticker symbol.")
             return pd.DataFrame()
         
-        # Ensure columns are in a consistent format
-        self.data.columns = [col.lower().replace(' ', '_') for col in self.data.columns]
+        # --- FIX: Robustly flatten column index ---
+        if isinstance(self.data.columns, pd.MultiIndex):
+            # If it's a multi-index, take the first level (e.g., 'Open', 'Close')
+            self.data.columns = self.data.columns.get_level_values(0)
+
+        # Now, ensure all column names are lowercase strings
+        self.data.columns = [str(col).lower().replace(' ', '_') for col in self.data.columns]
+        
         logging.info(f"Data fetched successfully. Shape: {self.data.shape}")
         return self.data
 
     def create_features(self) -> pd.DataFrame:
         """
         Engineers a comprehensive set of technical analysis features on the fetched data.
-        Requires fetch_data() to be called first.
         """
         if self.data is None or self.data.empty:
             logging.error("Data not fetched. Please call fetch_data() before creating features.")
@@ -48,7 +47,6 @@ class LiveDataHandler:
 
         logging.info("Starting feature engineering for live data...")
 
-        # Use pandas-ta to create a custom strategy
         custom_strategy = ta.Strategy(
             name="Comprehensive TA",
             description="A mix of momentum, volatility, and trend indicators",
@@ -67,12 +65,10 @@ class LiveDataHandler:
             ]
         )
 
-        # Apply the strategy to the data
         self.data.ta.strategy(custom_strategy)
 
-        # --- Additional Custom Features ---
         # Price-to-Moving-Average Ratios
-        if 'EMA_50' in self.data.columns and 'EMA_200' in self.data.columns:
+        if 'ema_50' in self.data.columns and 'ema_200' in self.data.columns:
             self.data['price_to_ema50'] = self.data['close'] / self.data['EMA_50']
             self.data['price_to_ema200'] = self.data['close'] / self.data['EMA_200']
             self.data['ema50_to_ema200'] = self.data['EMA_50'] / self.data['EMA_200']
@@ -81,7 +77,6 @@ class LiveDataHandler:
         for lag in [1, 3, 5, 10, 21]:
             self.data[f'return_{lag}d'] = self.data['close'].pct_change(lag)
 
-        # Drop rows with NaNs created by indicators
         self.data.dropna(inplace=True)
 
         logging.info(f"Feature engineering complete. Final data shape: {self.data.shape}")
@@ -89,7 +84,7 @@ class LiveDataHandler:
 
         return self.data
 
-# --- Example Usage (for testing the script directly) ---
+# Example Usage
 if __name__ == "__main__":
     pipeline = LiveDataHandler(ticker="SPY")
     raw_data = pipeline.fetch_data(period="5y")
